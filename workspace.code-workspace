@@ -1,0 +1,9 @@
+{
+	"folders": [],
+	"settings": {
+		"nrf-connect.applications": [],
+		"files.associations": {
+			"turbidity_sensor_util.h": "c"
+		}
+	}
+}

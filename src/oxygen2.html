@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Oxygen2 Water Quality Monitor</title>
+  <style>
+    body { font-family: sans-serif; background: #f8f9fa; padding: 2em; }
+    .sensor { font-size: 1.3em; margin-bottom: 1em; }
+    label { margin-right: 1em; }
+    input[type="number"] { width: 5em; }
+    button { margin-top: 1em; padding: 0.5em 1.5em; }
+  </style>
+</head>
+<body>
+  <h1>Oxygen2 - Water Quality Monitor</h1>
+  <button id="connect">Connect to Device</button>
+
+  <div id="status" style="margin:1em 0;color:#007bff;"></div>
+
+  <div id="liveData" style="display:none;">
+    <div class="sensor">O₂: <span id="o2"></span> µM</div>
+    <div class="sensor">Saturation: <span id="sat"></span> %</div>
+    <div class="sensor">Temperature: <span id="temp"></span> °C</div>
+
+    <hr>
+    <h3>Thresholds</h3>
+    <form id="thresholds">
+      <label>O₂ Threshold:
+        <input type="number" step="0.01" id="o2Thresh"> µM
+      </label>
+      <label>Saturation Threshold:
+        <input type="number" step="0.01" id="satThresh"> %
+      </label>
+      <label>Temp Threshold:
+        <input type="number" step="0.01" id="tempThresh"> °C
+      </label>
+      <button type="submit">Update Thresholds</button>
+    </form>
+  </div>
+
+  <script>
+    // --- UUIDs for your custom service/characteristics ---
+const SERVICE_UUID         = '12345678-1234-5678-1234-56789abcdef0';
+const SENSOR_UUID          = '12345678-1234-5678-1234-56789abcdef1';
+const O2_THRESH_UUID       = '12345678-1234-5678-1234-56789abcdef2';
+const SAT_THRESH_UUID      = '12345678-1234-5678-1234-56789abcdef3';
+const TEMP_THRESH_UUID     = '12345678-1234-5678-1234-56789abcdef4';
+
+// --- Globals for BLE device and characteristics ---
+let bleDevice;
+let gattServer;
+let sensorChar, o2ThreshChar, satThreshChar, tempThreshChar;
+
+// --- DOM Elements ---
+const statusDiv = document.getElementById('status');
+const liveDataDiv = document.getElementById('liveData');
+const o2Span = document.getElementById('o2');
+const satSpan = document.getElementById('sat');
+const tempSpan = document.getElementById('temp');
+const o2Input = document.getElementById('o2Thresh');
+const satInput = document.getElementById('satThresh');
+const tempInput = document.getElementById('tempThresh');
+
+// --- Step 1: Connect button ---
+document.getElementById('connect').addEventListener('click', async () => {
+  try {
+    statusDiv.textContent = 'Requesting BLE device...';
+    bleDevice = await navigator.bluetooth.requestDevice({
+      filters: [{ name: 'Oxygen2' }],
+      optionalServices: [SERVICE_UUID]
+    });
+
+    statusDiv.textContent = 'Connecting to GATT server...';
+    gattServer = await bleDevice.gatt.connect();
+
+    statusDiv.textContent = 'Discovering services and characteristics...';
+    const service = await gattServer.getPrimaryService(SERVICE_UUID);
+
+    // Get all characteristics
+    sensorChar = await service.getCharacteristic(SENSOR_UUID);
+    o2ThreshChar = await service.getCharacteristic(O2_THRESH_UUID);
+    satThreshChar = await service.getCharacteristic(SAT_THRESH_UUID);
+    tempThreshChar = await service.getCharacteristic(TEMP_THRESH_UUID);
+
+    statusDiv.textContent = 'Connected! Reading values...';
+    liveDataDiv.style.display = '';
+
+    // Continue with next steps (read, subscribe, etc.)
+    await readAllThresholds();
+    await subscribeSensorData();
+
+  } catch (err) {
+    statusDiv.textContent = 'Connection failed: ' + err;
+    liveDataDiv.style.display = 'none';
+  }
+});
+
+// --- Step 2: Read all thresholds and display them ---
+async function readAllThresholds() {
+  const o2 = await o2ThreshChar.readValue();
+  const sat = await satThreshChar.readValue();
+  const temp = await tempThreshChar.readValue();
+  o2Input.value = o2.getFloat32(0, true).toFixed(2);
+  satInput.value = sat.getFloat32(0, true).toFixed(2);
+  tempInput.value = temp.getFloat32(0, true).toFixed(2);
+}
+
+// --- Step 3: Subscribe to sensor data notifications ---
+async function subscribeSensorData() {
+  // Initial read
+  let value = await sensorChar.readValue();
+  displaySensorData(value);
+
+  // Notifications
+  await sensorChar.startNotifications();
+  sensorChar.addEventListener('characteristicvaluechanged', event => {
+    displaySensorData(event.target.value);
+  });
+}
+
+// --- Helper: Display sensor data (3 floats, little-endian) ---
+function displaySensorData(dataView) {
+  o2Span.textContent = dataView.getFloat32(0, true).toFixed(2);
+  satSpan.textContent = dataView.getFloat32(4, true).toFixed(2);
+  tempSpan.textContent = dataView.getFloat32(8, true).toFixed(2);
+}
+
+// --- Step 4: Update thresholds (Prevent form reload!) ---
+document.getElementById('thresholds').addEventListener('submit', async (event) => {
+  event.preventDefault(); // <--- THIS LINE PREVENTS PAGE RELOAD!
+  try {
+    // Get values from inputs
+    let o2Val = parseFloat(o2Input.value);
+    let satVal = parseFloat(satInput.value);
+    let tempVal = parseFloat(tempInput.value);
+
+    // Write O2 threshold
+    let buf = new ArrayBuffer(4);
+    let dv = new DataView(buf);
+
+    dv.setFloat32(0, o2Val, true);
+    await o2ThreshChar.writeValue(buf);
+
+    dv.setFloat32(0, satVal, true);
+    await satThreshChar.writeValue(buf);
+
+    dv.setFloat32(0, tempVal, true);
+    await tempThreshChar.writeValue(buf);
+
+    statusDiv.textContent = "Thresholds updated!";
+  } catch (err) {
+    statusDiv.textContent = "Threshold update failed: " + err;
+  }
+});
+
+
+  </script>
+</body>
+</html>
