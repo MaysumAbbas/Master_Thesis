@@ -1,8 +1,6 @@
 #include "turbidity_sensor.h"
-#include <zephyr/drivers/gpio.h>
-#include <zephyr/drivers/uart.h>
-#include <zephyr/sys/printk.h>
 #include <zephyr/kernel.h>
+#include <zephyr/sys/printk.h>
 #include <string.h>
 
 uint16_t modbus_crc16(const uint8_t *buf, uint16_t len) {
@@ -33,52 +31,6 @@ void send_modbus_read(uint8_t *tx_buf, size_t *tx_len) {
     *tx_len = 8;
 }
 
-bool read_turbidity_sensor(const struct device *uart_dev, const struct device *gpio_dev, int rs485_de_pin, float *turb, float *temp) {
-    uint8_t tx_buf[8];
-    uint8_t rx_buf[16];
-    size_t tx_len = 0, rx_len = 0;
-
-    send_modbus_read(tx_buf, &tx_len);
-
-    // Set DE high (transmit)
-    gpio_pin_set(gpio_dev, rs485_de_pin, 1);
-    k_sleep(K_MSEC(10)); // Allow line to settle
-
-    // Send the query
-    for (size_t i = 0; i < tx_len; i++)
-        uart_poll_out(uart_dev, tx_buf[i]);
-    k_sleep(K_MSEC(2)); // Wait for last byte
-
-    // Set DE low (receive)
-    gpio_pin_set(gpio_dev, rs485_de_pin, 0);
-
-    // Wait for response
-    int timeout = 200; // ms
-    int t = 0;
-    rx_len = 0;
-    while (t < timeout && rx_len < sizeof(rx_buf)) {
-        uint8_t c;
-        if (uart_poll_in(uart_dev, &c) == 0) {
-            rx_buf[rx_len++] = c;
-        } else {
-            k_sleep(K_MSEC(2));
-            t += 2;
-        }
-    }
-
-    // Parse response (address, func, byte count, data[4], CRC[2])
-    if (rx_len >= 9 && rx_buf[1] == 0x03 && rx_buf[2] == 0x04) {
-        int turb_raw = (rx_buf[3] << 8) | rx_buf[4];
-        int temp_raw = (rx_buf[5] << 8) | rx_buf[6];
-        *turb = turb_raw / 10.0f;
-        *temp = temp_raw / 10.0f;
-        return true;
-    } else {
-        *turb = 0;
-        *temp = 0;
-        return false;
-    }
-}
 
 void build_set_baud9600(uint8_t *tx_buf, size_t *tx_len) {
     tx_buf[0] = 0x01;      // Sensor address (change if needed)

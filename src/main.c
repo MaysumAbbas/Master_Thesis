@@ -7,6 +7,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#include "oxygen_sensor.h"
+
 // For LCD
 #include "fonts.h"
 #include "lcd.h"
@@ -122,22 +124,6 @@ BT_GATT_SERVICE_DEFINE(wq_svc,
 
 // End of Wireless Communication //
 
-bool parse_measurement(const char *buf, float *conc, float *sat, float *temp) {
-    const char *cptr, *sptr, *tptr;
-    cptr = strstr(buf, "[uM]");
-    if (!cptr) return false;
-    *conc = strtof(cptr + 4, NULL);
-
-    sptr = strstr(buf, "[%]");
-    if (!sptr) return false;
-    *sat = strtof(sptr + 3, NULL);
-
-    tptr = strstr(buf, "[Deg.C]");
-    if (!tptr) return false;
-    *temp = strtof(tptr + 7, NULL);
-
-    return true;
-}
 
 void main(void) {
     const struct device *uart_dev = DEVICE_DT_GET(DT_NODELABEL(uart0));
@@ -155,11 +141,7 @@ void main(void) {
     lcd_init(gpio_dev);
     lcd_clear(gpio_dev);
 
-    char buf[256];
-    int idx = 0;
-    char c;
     float conc, sat, temp;
-
     int err;
 
     printk("Starting Oxygen2 BLE example...\n");
@@ -191,51 +173,37 @@ void main(void) {
     printk("Advertising started\n");
 
     while (1) {
-        if (uart_poll_in(uart_dev, &c) == 0) {
-            if (c == '\n' || c == '\r') {
-                if (idx > 0) {
-                    buf[idx] = '\0';
+        if (oxygen_read_from_uart(uart_dev, &conc, &sat, &temp)) {
+            printk("PARSED: O2=%d.%02d uM  Sat=%d.%02d%%  T=%d.%02d C\n",
+                (int)conc,   ((int)(conc * 100)) % 100,
+                (int)sat,    ((int)(sat  * 100)) % 100,
+                (int)temp,   ((int)(temp * 100)) % 100
+            );
+            // LCD display
+            char line1[32], line2[32], line3[32];
+            snprintf(line1, sizeof(line1), "O2: %d.%02d uM", (int)conc, ((int)(conc*100))%100);
+            snprintf(line2, sizeof(line2), "Sat: %d.%02d%%", (int)sat, ((int)(sat*100))%100);
+            snprintf(line3, sizeof(line3), "T: %d.%02d C", (int)temp, ((int)(temp*100))%100);
 
-                    if (strstr(buf, "MEASUR")) {  // Only process real sensor data
-                        if (parse_measurement(buf, &conc, &sat, &temp)) {
-                            printk("PARSED: O2=%d.%02d uM  Sat=%d.%02d%%  T=%d.%02d C\n",
-                                (int)conc,   ((int)(conc * 100)) % 100,
-                                (int)sat,    ((int)(sat  * 100)) % 100,
-                                (int)temp,   ((int)(temp * 100)) % 100
-                            );
-                            // LCD display
-                            char line1[32], line2[32], line3[32];
-                            snprintf(line1, sizeof(line1), "O2: %d.%02d uM", (int)conc, ((int)(conc*100))%100);
-                            snprintf(line2, sizeof(line2), "Sat: %d.%02d%%", (int)sat, ((int)(sat*100))%100);
-                            snprintf(line3, sizeof(line3), "T: %d.%02d C", (int)temp, ((int)(temp*100))%100);
+            //Updating Sensor Data for Bluetooth
+            sensor_data[0] = conc;
+            sensor_data[1] = sat;
+            sensor_data[2] = temp;
 
-                            //Updating Sensor Data for Bluetooth
-                            sensor_data[0] = conc;
-                            sensor_data[1] = sat;
-                            sensor_data[2] = temp;
-
-                            // Send BLE notification if subscribed
-                            if (notify_enabled) {
-                                int err = bt_gatt_notify(NULL, &wq_svc.attrs[1], sensor_data, sizeof(sensor_data));
-                                if (err) {
-                                    printk("bt_gatt_notify failed: %d\n", err);
-                                }
-                            }
-
-                            lcd_clear(gpio_dev);
-                            lcd_draw_text(gpio_dev, 0, 0, line1);
-                            lcd_draw_text(gpio_dev, 1, 0, line2);
-                            lcd_draw_text(gpio_dev, 2, 0, line3);
-                        }
-                    }
-                    idx = 0;
+            // Send BLE notification if subscribed
+            if (notify_enabled) {
+                int err = bt_gatt_notify(NULL, &wq_svc.attrs[1], sensor_data, sizeof(sensor_data));
+                if (err) {
+                    printk("bt_gatt_notify failed: %d\n", err);
                 }
-            } else if (c >= 32 && c <= 126) {
-                if (idx < sizeof(buf) - 1) buf[idx++] = c;
-            } else if (c == '\t' && idx < sizeof(buf) - 1) {
-                buf[idx++] = ' ';
-            }
+             }
+
+            lcd_clear(gpio_dev);
+            lcd_draw_text(gpio_dev, 0, 0, line1);
+            lcd_draw_text(gpio_dev, 1, 0, line2);
+            lcd_draw_text(gpio_dev, 2, 0, line3);
         }
         k_msleep(1);
-    }
-}
+    }  
+}        
+        
