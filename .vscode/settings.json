@@ -1,6 +1,7 @@
 {
     "files.associations": {
         "oxygen_sensor.h": "c",
-        "fonts.h": "c"
+        "fonts.h": "c",
+        "turbidity_sensor.h": "c"
     }
 }
