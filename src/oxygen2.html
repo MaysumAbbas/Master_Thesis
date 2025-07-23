@@ -4,40 +4,207 @@
   <meta charset="utf-8">
   <title>Oxygen2 Water Quality Monitor</title>
   <style>
-    body { font-family: sans-serif; background: #f8f9fa; padding: 2em; }
-    .sensor { font-size: 1.3em; margin-bottom: 1em; }
-    label { margin-right: 1em; }
-    input[type="number"] { width: 5em; }
-    button { margin-top: 1em; padding: 0.5em 1.5em; }
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #f6f8fa;
+      margin: 0;
+      padding: 0;
+    }
+    .container {
+      max-width: 480px;
+      background: #fff;
+      margin: 2em auto;
+      border-radius: 18px;
+      box-shadow: 0 6px 24px 0 rgba(34,54,68,0.12);
+      padding: 2em 2.5em 1.5em 2.5em;
+    }
+    h1 {
+      text-align: center;
+      font-size: 2rem;
+      font-weight: 700;
+      letter-spacing: -1px;
+      margin-bottom: 1.7em;
+      color: #1e293b;
+    }
+    #connect {
+      display: block;
+      margin: 0 auto 1.2em auto;
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 1.1em;
+      font-weight: 500;
+      padding: 0.7em 2.5em;
+      cursor: pointer;
+      transition: background 0.2s;
+      box-shadow: 0 2px 8px rgba(34,54,68,0.09);
+    }
+    #connect:hover {
+      background: #1e40af;
+    }
+    #status {
+      margin: 0.2em 0 2em 0;
+      color: #2563eb;
+      text-align: center;
+      font-size: 1em;
+    }
+    .sensors-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0 0.7em;
+      margin-bottom: 1.2em;
+    }
+    .sensor-row {
+      background: #f1f5f9;
+      border-radius: 7px;
+      overflow: hidden;
+    }
+    .sensor-label, .sensor-value, .sensor-unit {
+      font-size: 1.18em;
+      padding: 0.62em 1em;
+      font-family: inherit;
+      color: #22223b;
+    }
+    .sensor-label {
+      text-align: right;
+      width: 45%;
+      font-weight: 500;
+      color: #1e293b;
+      background: transparent;
+      border-radius: 7px 0 0 7px;
+    }
+    .sensor-value {
+      text-align: right;
+      width: 30%;
+      font-feature-settings: "tnum";
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.01em;
+      font-weight: 600;
+      color: #2563eb;
+      background: transparent;
+    }
+    .sensor-unit {
+      width: 25%;
+      text-align: left;
+      color: #64748b;
+      font-size: 1em;
+      background: transparent;
+      border-radius: 0 7px 7px 0;
+    }
+    #lastUpdate {
+      text-align: right;
+      color: #64748b;
+      font-size: 0.98em;
+      margin-bottom: 1.2em;
+      margin-top: -0.5em;
+      font-family: 'Segoe UI', Arial, sans-serif;
+    }
+    hr {
+      margin: 1.4em 0 1.2em 0;
+      border: none;
+      border-top: 2px solid #e0e4e8;
+    }
+    h3 {
+      margin-top: 1em;
+      font-size: 1.1em;
+      font-weight: 600;
+      color: #1e293b;
+    }
+    label {
+      margin-right: 1.3em;
+      font-size: 1em;
+      color: #334155;
+    }
+    input[type="number"] {
+      width: 5em;
+      border-radius: 5px;
+      border: 1px solid #d1d5db;
+      padding: 0.3em 0.5em;
+      margin-left: 0.3em;
+      background: #f1f5f9;
+      font-size: 1em;
+    }
+    button[type="submit"] {
+      margin-top: 1.2em;
+      padding: 0.6em 1.8em;
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      border-radius: 7px;
+      font-size: 1em;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+      box-shadow: 0 2px 8px rgba(34,54,68,0.09);
+    }
+    button[type="submit"]:hover {
+      background: #1e40af;
+    }
+    form {
+      margin-bottom: 0.5em;
+      margin-top: 1em;
+      text-align: left;
+    }
+    @media (max-width: 600px) {
+      .container { max-width: 97vw; padding: 1.1em 1vw; }
+      h1 { font-size: 1.1em; }
+      .sensor-label, .sensor-value, .sensor-unit { font-size: 0.98em; }
+      form label { display: block; margin-bottom: 0.5em; }
+      #lastUpdate { font-size: 0.93em;}
+    }
   </style>
 </head>
 <body>
-  <h1>Oxygen2 - Water Quality Monitor</h1>
-  <button id="connect">Connect to Device</button>
-
-  <div id="status" style="margin:1em 0;color:#007bff;"></div>
-
-  <div id="liveData" style="display:none;">
-    <div class="sensor">O₂: <span id="o2"></span> µM</div>
-    <div class="sensor">Saturation: <span id="sat"></span> %</div>
-    <div class="sensor">Temperature: <span id="temp"></span> °C</div>
-    <div class="sensor">Battery: <span id="battery"></span> %</div>
-    <hr>
-    <h3>Thresholds</h3>
-    <form id="thresholds">
-      <label>O₂ Threshold:
-        <input type="number" step="0.01" id="o2Thresh"> µM
-      </label>
-      <label>Saturation Threshold:
-        <input type="number" step="0.01" id="satThresh"> %
-      </label>
-      <label>Temp Threshold:
-        <input type="number" step="0.01" id="tempThresh"> °C
-      </label>
-      <button type="submit">Update Thresholds</button>
-    </form>
+  <div class="container">
+    <h1>Real-time Water Quality Monitor</h1>
+    <button id="connect">Connect to Device</button>
+    <div id="status"></div>
+    <div id="liveData" style="display:none;">
+      <table class="sensors-table">
+        <tr class="sensor-row">
+          <td class="sensor-label">O₂:</td>
+          <td class="sensor-value"><span id="o2"></span></td>
+          <td class="sensor-unit">µM</td>
+        </tr>
+        <tr class="sensor-row">
+          <td class="sensor-label">Saturation:</td>
+          <td class="sensor-value"><span id="sat"></span></td>
+          <td class="sensor-unit">%</td>
+        </tr>
+        <tr class="sensor-row">
+          <td class="sensor-label">Temperature:</td>
+          <td class="sensor-value"><span id="temp"></span></td>
+          <td class="sensor-unit">°C</td>
+        </tr>
+        <tr class="sensor-row">
+          <td class="sensor-label">Turbidity:</td>
+          <td class="sensor-value"><span id="turb"></span></td>
+          <td class="sensor-unit">NTU</td>
+        </tr>
+        <tr class="sensor-row">
+          <td class="sensor-label">Battery:</td>
+          <td class="sensor-value"><span id="battery"></span></td>
+          <td class="sensor-unit">%</td>
+        </tr>
+      </table>
+      <div id="lastUpdate"></div>
+      <hr>
+      <h3>Thresholds</h3>
+      <form id="thresholds">
+        <label>O₂ Threshold:
+          <input type="number" step="0.01" id="o2Thresh"> µM
+        </label>
+        <label>Saturation Threshold:
+          <input type="number" step="0.01" id="satThresh"> %
+        </label>
+        <label>Temp Threshold:
+          <input type="number" step="0.01" id="tempThresh"> °C
+        </label>
+        <button type="submit">Update Thresholds</button>
+      </form>
+    </div>
   </div>
-
   <script>
     // --- UUIDs for your custom service/characteristics ---
     const SERVICE_UUID         = '12345678-1234-5678-1234-56789abcdef0';
@@ -57,10 +224,12 @@
     const o2Span = document.getElementById('o2');
     const satSpan = document.getElementById('sat');
     const tempSpan = document.getElementById('temp');
+    const turbSpan = document.getElementById('turb');
     const batterySpan = document.getElementById('battery');
     const o2Input = document.getElementById('o2Thresh');
     const satInput = document.getElementById('satThresh');
     const tempInput = document.getElementById('tempThresh');
+    const lastUpdateDiv = document.getElementById('lastUpdate');
 
     // --- Connect button ---
     document.getElementById('connect').addEventListener('click', async () => {
@@ -125,7 +294,19 @@
       satSpan.textContent = dataView.getFloat32(4, true).toFixed(2);
       tempSpan.textContent = dataView.getFloat32(8, true).toFixed(2);
       batterySpan.textContent = dataView.getFloat32(12, true).toFixed(0); // as percent
+      // Simulate turbidity for demo:
+      turbSpan.textContent = (50 + Math.random() * 50).toFixed(1); // 50.0–100.0 NTU
+      // Show last update time/date:
+      lastUpdateDiv.textContent = "Last update: " + new Date().toLocaleString();
     }
+
+    // --- Optional: Simulate random turbidity even without BLE (for demo/screenshot) ---
+    setInterval(() => {
+      if (turbSpan) {
+        turbSpan.textContent = (50 + Math.random() * 50).toFixed(1); // 50.0–100.0 NTU
+        lastUpdateDiv.textContent = "Last update: " + new Date().toLocaleString();
+      }
+    }, 5000);
 
     // --- Update thresholds (Prevent form reload!) ---
     document.getElementById('thresholds').addEventListener('submit', async (event) => {

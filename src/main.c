@@ -10,7 +10,7 @@
 #include <nrfx_saadc.h>
 
 #include "oxygen_sensor.h"
-//#include "turbidity_sensor.h" // (Commented as not used)
+#include "turbidity_sensor.h"
 
 #include "fonts.h"
 #include "lcd.h"
@@ -21,8 +21,10 @@
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/bluetooth/uuid.h>
 
-#define S0_PIN 11
-#define TURB_DE_PIN 25
+#define S0_PIN 11 // Selector pin (P0.11 -> 74HC4052 S0)
+#define TURB_DE_PIN 25 // MAX3485 DE (P0.25)
+#define BUZZER_PIN 24
+
 
 #define BT_UUID_WQ_SERVICE_VAL \
     BT_UUID_128_ENCODE(0x12345678, 0x1234, 0x5678, 0x1234, 0x56789abcdef0)
@@ -84,7 +86,7 @@ static struct bt_uuid_128 wq_temp_thresh_uuid=BT_UUID_INIT_128(BT_UUID_WQ_TEMP_T
 
 // Data [O2, Sat, Temp, Battery %]
 static float sensor_data[4] = {0};
-static float o2_thresh = 50.0;
+static float o2_thresh = 190.0;
 static float sat_thresh = 80.0;
 static float temp_thresh = 25.0;
 
@@ -178,8 +180,10 @@ void main(void) {
 
     adc_channel_setup(adc_dev, &my_channel_cfg);
 
-    gpio_pin_configure(gpio_dev, S0_PIN, GPIO_OUTPUT_ACTIVE);
-    gpio_pin_configure(gpio_dev, TURB_DE_PIN, GPIO_OUTPUT_INACTIVE);
+    gpio_pin_configure(gpio_dev, S0_PIN, GPIO_OUTPUT_ACTIVE); //Sets to 1
+    gpio_pin_configure(gpio_dev, TURB_DE_PIN, GPIO_OUTPUT_INACTIVE); //Sets to 0
+    gpio_pin_configure(gpio_dev, BUZZER_PIN, GPIO_OUTPUT_INACTIVE);//Sets to 0
+
 
     lcd_init(gpio_dev);
     lcd_clear(gpio_dev);
@@ -210,17 +214,32 @@ void main(void) {
     }
     printk("Advertising started\n");
 
-    gpio_pin_set(gpio_dev, S0_PIN, 1);
-
     float conc = 0, sat = 0, temp = 0;
+    gpio_pin_set(gpio_dev, S0_PIN, 1); //For Selecting Oxygen Sensor
+    
+    //float turbidity = 0;
+    //gpio_pin_set(gpio_dev, S0_PIN, 0); //For Selecting Turbidity Sensor
+
 
     while (1) {
+        /*
+        turbidity_read_from_uart(uart_dev, gpio_dev, TURB_DE_PIN, &turbidity);
+        printk("Turbidity: %d.%01d NTU\n",
+            (int)turbidity, ((int)(turbidity * 10)) % 10
+        );
+        char line4[32];
+        snprintf(line4, sizeof(line4), "Turb: %d.%01d NTU", (int)turbidity, ((int)(turbidity*10))%10);
+        lcd_clear(gpio_dev);
+        lcd_draw_text(gpio_dev, 0, 0, line4);
+        */
+
+
+        
         float vbat = read_battery_voltage(adc_dev);
         int battery_percent = (int)(((vbat - 3.0) / (4.2 - 3.0)) * 100);
         if (battery_percent > 100) battery_percent = 100;
         if (battery_percent < 0) battery_percent = 0;
 
-        gpio_pin_set(gpio_dev, S0_PIN, 1);  // Select O₂
         if (oxygen_read_from_uart(uart_dev, &conc, &sat, &temp)) {
             printk("PARSED: O2=%d.%02d uM  Sat=%d.%02d%%  T=%d.%02d C Battery=%d%%\n",
                 (int)conc,   ((int)(conc * 100)) % 100,
@@ -233,6 +252,14 @@ void main(void) {
             sensor_data[1] = sat;
             sensor_data[2] = temp;
             sensor_data[3] = (float)battery_percent;
+            
+            // --- Temperature alert logic ---
+            if (conc < o2_thresh) {
+                gpio_pin_set(gpio_dev, BUZZER_PIN, 1); // Buzzer ON
+                printk("ALERT: Oxygen below threshold! Buzzer ON\n");
+            } else {
+                gpio_pin_set(gpio_dev, BUZZER_PIN, 0); // Buzzer OFF
+            }
 
             // Print and update
             char line1[32], line2[32], line3[32], line5[32];
@@ -254,6 +281,8 @@ void main(void) {
                 }
             }
         }
-        k_msleep(1);
+       
+        k_msleep(1); //1 seconds for Oxygen Sensor
+        //k_msleep(20000); //20 seconds for Turbidity Sensor
     }
 }
