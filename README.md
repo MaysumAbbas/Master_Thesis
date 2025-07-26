@@ -30,6 +30,7 @@ oxygen2/
   - Turbidity (in NTU)
 - ✅ **Data parsing** and formatting from noisy UART input  
 - ✅ **Display integration** using ST7565R-compatible 128x64 LCD
+- ✅ **Buzzer Alerts** for unsafe thresholds
 - ✅ **Bluetooth wireless communication integration** with real time values hosted on webpage
 - ✅ **74HC4052 Multiplexer** used to switch UART due to limitation of only one UART on the nRF52 dk.
 - ✅ **Real-time data shown on Serial terminal, LCD and webpage**
@@ -48,12 +49,6 @@ The RS-ZD-N01 Turbidity sensor provides:
 
 These values are critical for assessing fish health and stress levels during transport. 
 
----
-
-## 🔜 Next Steps
-
-- [ ] Integrate **wireless communication** (Bluetooth/Wi-Fi)
-- [ ] Add **buzzer/LED alerts** for unsafe thresholds
 ---
 
 ## 🔧 Setup
